@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>סודוקו - לחיזוק הזיכרון</title>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FFF8F0;
+    --card: #FFFFFF;
+    --primary: #E07B39;
+    --primary-light: #F4A96A;
+    --secondary: #5B8FB9;
+    --secondary-light: #A8CCE8;
+    --accent: #6BAA75;
+    --soft: #F9EFE4;
+    --border: #D9C4B0;
+    --text: #3A2E26;
+    --text-muted: #8B7B6E;
+    --given: #2C4A6E;
+    --user-input: #C0440A;
+    --selected-bg: #FDE8D0;
+    --highlight-bg: #FFF3E8;
+    --error-bg: #FFE0E0;
+    --error-color: #C0392B;
+    --hint-bg: #E8F8EE;
+    --hint-color: #27AE60;
+    --shadow: 0 4px 20px rgba(0,0,0,0.08);
+    --shadow-deep: 0 8px 32px rgba(0,0,0,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Assistant', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    direction: rtl;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse at 10% 20%, rgba(224,123,57,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 90% 80%, rgba(91,143,185,0.08) 0%, transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .app {
+    position: relative; z-index: 1;
+    max-width: 960px; margin: 0 auto;
+    padding: 20px 16px 50px;
+  }
+
+  /* ── Header ── */
+  .header { text-align: center; margin-bottom: 20px; animation: slideDown 0.6s ease; }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:translateY(0); } }
+  .header-icon { font-size: 52px; margin-bottom: 4px; display: block; animation: float 4s ease-in-out infinite; }
+  @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+  .header h1 { font-size: 2.3rem; font-weight: 800; color: var(--primary); }
+  .header p  { font-size: 1.05rem; color: var(--text-muted); margin-top: 4px; }
+
+  /* ── Instructions (collapsed by default) ── */
+  .instructions-card {
+    background: white;
+    border: 2px solid var(--border); border-radius: 20px;
+    margin-bottom: 20px; overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .instructions-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 22px; cursor: pointer; user-select: none;
+    background: linear-gradient(135deg, #FFF3E8, #EAF4FF);
+    transition: background 0.2s;
+  }
+  .instructions-header:hover { background: linear-gradient(135deg, #FFE8D0, #D8ECFF); }
+
+  .instructions-header-left {
+    font-size: 1.15rem; font-weight: 800; color: var(--secondary);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .instr-arrow {
+    font-size: 1.1rem; transition: transform 0.35s;
+    color: var(--text-muted); font-weight: 800;
+  }
+  .instr-arrow.open { transform: rotate(180deg); }
+
+  .instructions-body {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.45s ease;
+  }
+  .instructions-body.open { max-height: 800px; }
+
+  .instructions-inner { padding: 6px 22px 22px; }
+
+  .steps-list { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+  .step {
+    display: flex; align-items: flex-start; gap: 14px;
+    background: var(--soft); border-radius: 14px; padding: 14px 16px;
+    border: 1.5px solid var(--border);
+  }
+  .step-num {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--primary); color: white;
+    font-size: 1.1rem; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .step-text { font-size: 1.05rem; font-weight: 600; color: var(--text); line-height: 1.5; }
+  .step-text strong { color: var(--primary); }
+  .step-text em { color: var(--secondary); font-style: normal; font-weight: 700; }
+
+  .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .rule-item {
+    background: var(--soft); border-radius: 12px; padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    font-size: 0.98rem; font-weight: 600; color: var(--text);
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .rule-icon { font-size: 1.3rem; flex-shrink: 0; }
+
+  .mode-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .mode-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    border-radius: 50px; padding: 7px 14px;
+    font-size: 0.95rem; font-weight: 700;
+  }
+  .mode-badge.orange { background: var(--soft); border: 1.5px solid var(--primary-light); color: var(--primary); }
+  .mode-badge.blue   { background: #EAF4FF; border: 1.5px solid var(--secondary-light); color: var(--secondary); }
+
+  /* ── Info bar ── */
+  .info-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--card); border-radius: 20px;
+    padding: 14px 24px; margin-bottom: 18px;
+    box-shadow: var(--shadow); border: 2px solid var(--border);
+  }
+  .info-item { text-align: center; }
+  .info-label { font-size: 0.82rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .info-value { font-size: 1.75rem; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .info-value.timer    { color: var(--secondary); }
+  .info-value.mistakes { color: var(--error-color); }
+  .info-value.progress { color: var(--accent); }
+
+  /* ── Difficulty ── */
+  .difficulty-bar {
+    display: flex; gap: 10px; justify-content: center;
+    margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .diff-btn {
+    padding: 12px 26px; border-radius: 50px;
+    border: 3px solid var(--border); background: var(--card);
+    font-family: 'Assistant', sans-serif; font-size: 1.08rem; font-weight: 700;
+    color: var(--text-muted); cursor: pointer; transition: all 0.25s;
+    position: relative;
+  }
+  .diff-btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); }
+  .diff-btn.active { background: var(--primary); border-color: var(--primary); color: white; box-shadow: 0 4px 16px rgba(224,123,57,0.4); }
+  .diff-badge {
+    font-size: 0.68rem; background: var(--secondary); color: white;
+    border-radius: 20px; padding: 2px 7px;
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; font-weight: 700;
+  }
+  .diff-btn.active .diff-badge { background: #1a5276; }
+
+  /* ── Game area ── */
+  .game-area { display: flex; gap: 20px; align-items: flex-start; }
+
+  /* ── Grid ── */
+  .grid-wrapper {
+    flex: 1; background: var(--card); border-radius: 20px;
+    padding: 16px; box-shadow: var(--shadow-deep); border: 3px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .grid-mode-label { font-size: 0.9rem; font-weight: 700; color: var(--text-muted); }
+
+  .sudoku-grid {
+    display: grid; gap: 2px; background: var(--given);
+    border-radius: 10px; overflow: hidden; border: 3px solid var(--given);
+    width: 100%; max-width: 440px;
+  }
+  .sudoku-grid.grid-9 { grid-template-columns: repeat(9, 1fr); }
+  .sudoku-grid.grid-6 { grid-template-columns: repeat(6, 1fr); }
+
+  .cell {
+    background: var(--card); aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    user-select: none; min-height: 40px;
+  }
+  .grid-9 .cell { font-size: clamp(1rem, 2.5vw, 1.55rem); }
+  .grid-6 .cell { font-size: clamp(1.2rem, 4vw, 2rem); }
+
+  /* Box borders */
+  .grid-9 .cell[data-col="3"], .grid-9 .cell[data-col="6"] { border-right: 3px solid var(--given); }
+  .grid-9 .cell[data-row="3"], .grid-9 .cell[data-row="6"] { border-top: 3px solid var(--given); }
+  .grid-6 .cell[data-col="3"]                               { border-right: 3px solid var(--given); }
+  .grid-6 .cell[data-row="2"], .grid-6 .cell[data-row="4"] { border-top: 3px solid var(--given); }
+
+  .cell.given       { color: var(--given); font-weight: 800; }
+  .cell.user        { color: var(--user-input); }
+  .cell.hinted      { color: var(--hint-color); font-weight: 800; background: var(--hint-bg); }
+  .cell.error       { background: var(--error-bg) !important; color: var(--error-color) !important; animation: shake 0.35s ease; }
+  .cell.selected    { background: var(--selected-bg) !important; transform: scale(1.06); z-index: 2; box-shadow: inset 0 0 0 2px var(--primary); }
+  .cell.same-zone   { background: var(--highlight-bg); }
+  .cell.same-number { background: #FFE2C8 !important; }
+  .cell:not(.given):not(.hinted):hover { background: var(--selected-bg); }
+
+  @keyframes shake { 0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);} }
+  @keyframes popCell { 0%{transform:scale(0.7);}60%{transform:scale(1.15);}100%{transform:scale(1);} }
+  .cell.just-placed { animation: popCell 0.3s ease; }
+
+  /* ── Controls ── */
+  .control-panel { width: 195px; display: flex; flex-direction: column; gap: 12px; }
+
+  .numpad { background: var(--card); border-radius: 20px; padding: 14px; box-shadow: var(--shadow); border: 2px solid var(--border); }
+  .numpad-title { text-align:center; font-size:0.82rem; font-weight:700; color:var(--text-muted); margin-bottom:10px; text-transform:uppercase; letter-spacing:1px; }
+  .numpad-grid  { display:grid; grid-template-columns: repeat(3,1fr); gap:8px; }
+
+  .num-btn {
+    aspect-ratio:1; border-radius:14px; border:2px solid var(--border); background:var(--soft);
+    font-family:'Assistant',sans-serif; font-size:1.5rem; font-weight:800; color:var(--text);
+    cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; min-height:50px;
+  }
+  .num-btn:hover { background:var(--primary-light); border-color:var(--primary); color:white; transform:scale(1.08); box-shadow:0 4px 14px rgba(224,123,57,0.3); }
+  .num-btn:active { transform:scale(0.95); }
+  .num-btn.dim    { opacity:0.25; pointer-events:none; }
+
+  .actions { display:flex; flex-direction:column; gap:8px; }
+  .action-btn {
+    width:100%; padding:13px; border-radius:16px; border:2px solid var(--border); background:var(--card);
+    font-family:'Assistant',sans-serif; font-size:1rem; font-weight:700; color:var(--text);
+    cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .action-btn:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+  .action-btn .icon { font-size:1.2rem; }
+  .action-btn.undo    { border-color:var(--secondary); color:var(--secondary); }
+  .action-btn.undo:hover { background:var(--secondary); color:white; }
+  .action-btn.redo    { border-color:var(--secondary-light); color:var(--secondary); }
+  .action-btn.redo:hover { background:var(--secondary-light); color:white; }
+  .action-btn.delete  { border-color:#E0A0A0; color:var(--error-color); }
+  .action-btn.delete:hover { background:#FFE0E0; }
+  .action-btn.restart { border-color:var(--primary); color:var(--primary); }
+  .action-btn.restart:hover { background:var(--primary); color:white; }
+  .action-btn.hint    { border-color:var(--accent); color:var(--accent); }
+  .action-btn.hint:hover { background:var(--accent); color:white; }
+  .action-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  /* hint flash */
+  @keyframes hintPulse {
+    0%  { box-shadow:none; }
+    40% { box-shadow: 0 0 0 6px rgba(107,170,117,0.4); }
+    100%{ box-shadow:none; }
+  }
+  .cell.hint-flash { animation: hintPulse 0.6s ease, popCell 0.3s ease; }
+
+  /* ── Win overlay ── */
+  .win-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(8px); z-index:100; align-items:center; justify-content:center; }
+  .win-overlay.show { display:flex; animation:fadeIn 0.5s ease; }
+  @keyframes fadeIn { from{opacity:0;}to{opacity:1;} }
+  .win-card { background:var(--card); border-radius:30px; padding:50px 40px; text-align:center; box-shadow:var(--shadow-deep); max-width:380px; width:90%; animation:popIn 0.5s cubic-bezier(0.34,1.56,0.64,1); border:3px solid var(--primary-light); }
+  @keyframes popIn { from{opacity:0;transform:scale(0.7);}to{opacity:1;transform:scale(1);} }
+  .win-emoji { font-size:4rem; margin-bottom:16px; display:block; animation:float 2s ease-in-out infinite; }
+  .win-title { font-size:2rem; font-weight:800; color:var(--primary); margin-bottom:8px; }
+  .win-sub   { font-size:1.1rem; color:var(--text-muted); margin-bottom:6px; }
+  .win-time  { font-size:1.6rem; font-weight:800; color:var(--secondary); margin-bottom:24px; }
+  .win-btn   { padding:16px 36px; border-radius:50px; border:none; background:linear-gradient(135deg,var(--primary),var(--primary-light)); color:white; font-family:'Assistant',sans-serif; font-size:1.2rem; font-weight:800; cursor:pointer; box-shadow:0 6px 20px rgba(224,123,57,0.4); transition:transform 0.2s; }
+  .win-btn:hover { transform:scale(1.05); }
+
+  .confetti-container { position:fixed; inset:0; pointer-events:none; z-index:99; overflow:hidden; }
+  .confetti-piece { position:absolute; width:12px; height:12px; border-radius:2px; animation:confettiFall linear forwards; }
+  @keyframes confettiFall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1;}100%{transform:translateY(100vh) rotate(720deg);opacity:0;} }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .game-area { flex-direction: column; }
+    .control-panel { width:100%; flex-direction:row; flex-wrap:wrap; }
+    .numpad { flex:1; min-width:180px; }
+    .actions { flex-direction:row; flex-wrap:wrap; flex:1; }
+    .action-btn { flex:1; min-width:70px; font-size:0.88rem; padding:11px 6px; }
+    .header h1 { font-size:1.8rem; }
+    .rules-grid { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <span class="header-icon">🧩</span>
+    <h1>סודוקו לזיכרון חד</h1>
+    <p>אתגר יומי לחיזוק המוח ושמירה על חדות הזיכרון</p>
+  </div>
+
+  <!-- Instructions — collapsed by default, opens on click -->
+  <div class="instructions-card">
+    <div class="instructions-header" onclick="toggleInstructions()">
+      <div class="instructions-header-left">📖 איך משחקים? — לחצו לפתיחת הוראות</div>
+      <div class="instr-arrow" id="instrArrow">▼</div>
+    </div>
+    <div class="instructions-body" id="instrBody">
+      <div class="instructions-inner">
+        <div class="steps-list">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">
+              <strong>קודם מסמנים ריבוע!</strong><br>
+              לחצו על ריבוע ריק בלוח — הוא יודגש בצבע כתום. זה הריבוע שתמלאו.
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">
+              <strong>אחר כך בוחרים מספר.</strong><br>
+              לחצו על מספר בלוח המספרים מצד שמאל — המספר ייכנס לריבוע שבחרתם.
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">
+              <strong>מה המטרה?</strong><br>
+              למלא את כל הריבועים כך שבכל <em>שורה</em>, בכל <em>עמודה</em> ובכל <em>קופסה מסומנת</em> — כל מספר מופיע <em>פעם אחת בלבד</em>.
+            </div>
+          </div>
+        </div>
+
+        <div class="rules-grid">
+          <div class="rule-item"><span class="rule-icon">↩️</span><span><strong>טעיתם?</strong> לחצו "חזור אחורה" ותנסו שוב.</span></div>
+          <div class="rule-item"><span class="rule-icon">🗑️</span><span><strong>רוצים למחוק?</strong> סמנו ריבוע ולחצו "מחק".</span></div>
+          <div class="rule-item"><span class="rule-icon">💡</span><span><strong>תקועים?</strong> לחצו "רמז" ויפתר ריבוע אחד בשבילכם.</span></div>
+          <div class="rule-item"><span class="rule-icon">🔄</span><span><strong>להתחיל מחדש?</strong> לחצו "התחל מחדש".</span></div>
+        </div>
+
+        <div class="mode-badges">
+          <div class="mode-badge orange">😊 קל מאוד — לוח 6×6, מספרים 1 עד 6</div>
+          <div class="mode-badge blue">🤔 קל / 🧠 בינוני — לוח 9×9, מספרים 1 עד 9</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info bar -->
+  <div class="info-bar">
+    <div class="info-item">
+      <div class="info-label">⏱ זמן</div>
+      <div class="info-value timer" id="timerDisplay">00:00</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">✅ הושלם</div>
+      <div class="info-value progress" id="progressDisplay">0%</div>
+    </div>
+    <div class="info-item">
+      <div class="info-label">❌ טעויות</div>
+      <div class="info-value mistakes" id="mistakesDisplay">0</div>
+    </div>
+  </div>
+
+  <!-- Difficulty -->
+  <div class="difficulty-bar">
+    <button class="diff-btn active" onclick="setDifficulty('easy')">
+      <span class="diff-badge">לוח 6×6</span>😊 קל מאוד
+    </button>
+    <button class="diff-btn" onclick="setDifficulty('medium')">
+      <span class="diff-badge">לוח 9×9</span>🤔 קל
+    </button>
+    <button class="diff-btn" onclick="setDifficulty('hard')">
+      <span class="diff-badge">לוח 9×9</span>🧠 בינוני
+    </button>
+  </div>
+
+  <!-- Game -->
+  <div class="game-area">
+    <div class="grid-wrapper">
+      <div class="grid-mode-label" id="gridModeLabel">לוח 6×6 — מספרים 1 עד 6</div>
+      <div class="sudoku-grid grid-6" id="grid"></div>
+    </div>
+
+    <div class="control-panel">
+      <div class="numpad">
+        <div class="numpad-title">✏️ בחר ספרה</div>
+        <div class="numpad-grid" id="numpad"></div>
+      </div>
+      <div class="actions">
+        <button class="action-btn undo"    onclick="undo()">    <span class="icon">↩️</span> חזור אחורה</button>
+        <button class="action-btn redo"    onclick="redo()">    <span class="icon">↪️</span> חזור קדימה</button>
+        <button class="action-btn delete"  onclick="deleteCell()"><span class="icon">🗑️</span> מחק</button>
+        <button class="action-btn hint"    onclick="giveHint()" id="hintBtn"><span class="icon">💡</span> רמז</button>
+        <button class="action-btn restart" onclick="confirmRestart()"><span class="icon">🔄</span> התחל מחדש</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Win overlay -->
+<div class="win-overlay" id="winOverlay">
+  <div class="win-card">
+    <span class="win-emoji">🎉</span>
+    <div class="win-title">כל הכבוד!</div>
+    <div class="win-sub">פתרת את הפאזל בהצלחה!</div>
+    <div class="win-time" id="winTime"></div>
+    <button class="win-btn" onclick="startNewGame()">משחק חדש 🎮</button>
+  </div>
+</div>
+<div class="confetti-container" id="confetti"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+let SIZE=6, TOTAL=36, MAX_NUM=6;
+let board=[], solution=[], given=[], hinted=[];
+let selectedCell=-1, difficulty='easy';
+let mistakes=0, timerSeconds=0, timerInterval=null;
+let history=[], future=[], numberCounts=[];
+
+// ── Sudoku engine ───────────────────────────────────────
+function boxDims() { return SIZE===6 ? {R:2,C:3} : {R:3,C:3}; }
+
+function isValidCell(bd, pos, num) {
+  const row=Math.floor(pos/SIZE), col=pos%SIZE;
+  for(let c=0;c<SIZE;c++) if(bd[row*SIZE+c]===num) return false;
+  for(let r=0;r<SIZE;r++) if(bd[r*SIZE+col]===num) return false;
+  const {R,C}=boxDims();
+  const br=Math.floor(row/R)*R, bc=Math.floor(col/C)*C;
+  for(let r=br;r<br+R;r++) for(let c=bc;c<bc+C;c++) if(bd[r*SIZE+c]===num) return false;
+  return true;
+}
+
+function sameBox(a,b) {
+  const {R,C}=boxDims();
+  const rA=Math.floor(a/SIZE),cA=a%SIZE,rB=Math.floor(b/SIZE),cB=b%SIZE;
+  return Math.floor(rA/R)===Math.floor(rB/R) && Math.floor(cA/C)===Math.floor(cB/C);
+}
+
+function solve(bd) {
+  const empty=bd.indexOf(0); if(empty===-1) return true;
+  const nums=Array.from({length:MAX_NUM},(_,i)=>i+1).sort(()=>Math.random()-0.5);
+  for(const n of nums){
+    if(isValidCell(bd,empty,n)){
+      bd[empty]=n; if(solve(bd)) return true; bd[empty]=0;
+    }
+  }
+  return false;
+}
+
+function generatePuzzle(diff) {
+  const sol=Array(TOTAL).fill(0);
+  solve(sol);
+  const removeMap={easy:16, medium:40, hard:52};
+  const puzzle=[...sol];
+  [...Array(TOTAL).keys()].sort(()=>Math.random()-0.5)
+    .slice(0, removeMap[diff])
+    .forEach(i=>{ puzzle[i]=0; });
+  return {puzzle, solution:sol};
+}
+
+// ── Game control ────────────────────────────────────────
+function startGame() {
+  SIZE    = difficulty==='easy' ? 6 : 9;
+  TOTAL   = SIZE*SIZE;
+  MAX_NUM = SIZE;
+
+  const {puzzle, solution:sol} = generatePuzzle(difficulty);
+  board    = [...puzzle];
+  solution = [...sol];
+  given    = board.map(v=>v!==0);
+  hinted   = Array(TOTAL).fill(false);
+  selectedCell = -1;
+  mistakes = 0; history=[]; future=[];
+  numberCounts = Array(MAX_NUM+1).fill(0);
+  board.forEach(v=>{ if(v) numberCounts[v]++; });
+
+  clearInterval(timerInterval); timerSeconds=0;
+  timerInterval=setInterval(()=>{ timerSeconds++; updateTimerDisplay(); },1000);
+
+  document.getElementById('grid').className=`sudoku-grid grid-${SIZE}`;
+  document.getElementById('gridModeLabel').textContent=
+    SIZE===6 ? 'לוח 6×6 — מספרים 1 עד 6' : 'לוח 9×9 — מספרים 1 עד 9';
+
+  updateTimerDisplay(); updateMistakesDisplay(); updateProgressDisplay();
+  renderGrid(); renderNumpad();
+}
+
+function setDifficulty(d) {
+  difficulty=d;
+  document.querySelectorAll('.diff-btn').forEach((b,i)=>{
+    b.classList.toggle('active',['easy','medium','hard'][i]===d);
+  });
+  startGame();
+}
+
+function startNewGame() {
+  document.getElementById('winOverlay').classList.remove('show');
+  document.getElementById('confetti').innerHTML='';
+  startGame();
+}
+
+function confirmRestart() {
+  if(confirm('להתחיל את הפאזל מחדש?')) {
+    board = board.map((v,i)=> (given[i]||hinted[i]) ? v : 0);
+    hinted = [...hinted]; // keep hints
+    history=[]; future=[]; mistakes=0;
+    numberCounts=Array(MAX_NUM+1).fill(0);
+    board.forEach(v=>{ if(v) numberCounts[v]++; });
+    updateMistakesDisplay(); updateProgressDisplay(); renderGrid(); renderNumpad();
+  }
+}
+
+// ── Cell actions ────────────────────────────────────────
+function selectCell(idx) {
+  selectedCell = idx;
+  renderGrid();
+}
+
+function enterNumber(num) {
+  if(selectedCell===-1) return;
+  if(given[selectedCell] || hinted[selectedCell]) return; // can't edit given/hinted cells
+
+  const prev = board[selectedCell];
+  if(prev===num) return;
+
+  history.push({idx:selectedCell, prev, next:num});
+  future=[];
+
+  if(prev && prev===solution[selectedCell]) numberCounts[prev]--;
+  board[selectedCell] = num;
+
+  if(num !== solution[selectedCell]) {
+    mistakes++; updateMistakesDisplay();
+    renderGrid(); renderNumpad(); return;
+  }
+
+  numberCounts[num]++;
+  updateProgressDisplay(); renderGrid(); renderNumpad();
+
+  // pop animation
+  const cells = document.getElementById('grid').children;
+  if(cells[selectedCell]) {
+    cells[selectedCell].classList.add('just-placed');
+    setTimeout(()=>cells[selectedCell]?.classList.remove('just-placed'),300);
+  }
+
+  checkWin();
+}
+
+function deleteCell() {
+  if(selectedCell===-1 || given[selectedCell] || hinted[selectedCell]) return;
+  const prev=board[selectedCell];
+  if(!prev) return;
+  history.push({idx:selectedCell, prev, next:0});
+  future=[];
+  if(prev===solution[selectedCell]) numberCounts[prev]--;
+  board[selectedCell]=0;
+  updateProgressDisplay(); renderGrid(); renderNumpad();
+}
+
+function undo() {
+  if(!history.length) return;
+  const a=history.pop(); future.push(a);
+  if(a.next && a.next===solution[a.idx]) numberCounts[a.next]--;
+  if(a.prev && a.prev===solution[a.idx]) numberCounts[a.prev]++;
+  board[a.idx]=a.prev; selectedCell=a.idx;
+  updateProgressDisplay(); renderGrid(); renderNumpad();
+}
+
+function redo() {
+  if(!future.length) return;
+  const a=future.pop(); history.push(a);
+  if(board[a.idx] && board[a.idx]===solution[a.idx]) numberCounts[board[a.idx]]--;
+  board[a.idx]=a.next;
+  if(a.next && a.next===solution[a.idx]) numberCounts[a.next]++;
+  selectedCell=a.idx;
+  updateProgressDisplay(); renderGrid(); renderNumpad();
+}
+
+// ── HINT ────────────────────────────────────────────────
+function giveHint() {
+  // Collect all cells that are empty (board[i]===0) and not given/hinted
+  const emptyCells=[];
+  for(let i=0;i<TOTAL;i++){
+    if(!given[i] && !hinted[i] && board[i]===0) emptyCells.push(i);
+  }
+  if(emptyCells.length===0) return;
+
+  // Prefer selected cell if it's empty; otherwise random
+  let target;
+  if(selectedCell!==-1 && !given[selectedCell] && !hinted[selectedCell] && board[selectedCell]===0){
+    target = selectedCell;
+  } else {
+    target = emptyCells[Math.floor(Math.random()*emptyCells.length)];
+  }
+
+  const num = solution[target];          // correct answer
+  board[target]  = num;
+  hinted[target] = true;                 // mark as hint-given
+  numberCounts[num]++;
+  selectedCell = target;
+
+  updateProgressDisplay(); renderGrid(); renderNumpad();
+
+  // Flash the cell green
+  const cells = document.getElementById('grid').children;
+  if(cells[target]){
+    cells[target].classList.add('hint-flash');
+    setTimeout(()=>cells[target]?.classList.remove('hint-flash'),700);
+  }
+
+  checkWin();
+}
+
+// ── Render ──────────────────────────────────────────────
+function renderGrid() {
+  const grid=document.getElementById('grid');
+  const selVal = selectedCell!==-1 ? board[selectedCell] : 0;
+  const selRow = selectedCell!==-1 ? Math.floor(selectedCell/SIZE) : -1;
+  const selCol = selectedCell!==-1 ? selectedCell%SIZE : -1;
+
+  grid.innerHTML='';
+
+  for(let i=0;i<TOTAL;i++){
+    const row=Math.floor(i/SIZE), col=i%SIZE;
+    const cell=document.createElement('div');
+    cell.className='cell';
+    cell.dataset.row=row; cell.dataset.col=col;
+
+    // styling
+    if(given[i])         cell.classList.add('given');
+    else if(hinted[i])   cell.classList.add('hinted');
+    else if(board[i] && board[i]!==solution[i]) cell.classList.add('user','error');
+    else if(board[i])    cell.classList.add('user');
+
+    if(i===selectedCell) {
+      cell.classList.add('selected');
+    } else if(selRow!==-1) {
+      if(row===selRow || col===selCol || sameBox(i,selectedCell))
+        cell.classList.add('same-zone');
+    }
+    if(selVal && board[i]===selVal && i!==selectedCell)
+      cell.classList.add('same-number');
+
+    if(board[i]) cell.textContent=board[i];
+
+    cell.addEventListener('click',()=>selectCell(i));
+    grid.appendChild(cell);
+  }
+}
+
+function renderNumpad() {
+  const np=document.getElementById('numpad'); np.innerHTML='';
+  for(let n=1;n<=MAX_NUM;n++){
+    const btn=document.createElement('button');
+    btn.className='num-btn';
+    if(numberCounts[n]>=SIZE) btn.classList.add('dim');
+    btn.textContent=n;
+    btn.addEventListener('click',()=>enterNumber(n));
+    np.appendChild(btn);
+  }
+}
+
+function updateTimerDisplay(){
+  const m=Math.floor(timerSeconds/60).toString().padStart(2,'0');
+  const s=(timerSeconds%60).toString().padStart(2,'0');
+  document.getElementById('timerDisplay').textContent=`${m}:${s}`;
+}
+function updateMistakesDisplay(){ document.getElementById('mistakesDisplay').textContent=mistakes; }
+function updateProgressDisplay(){
+  const filled=board.filter((v,i)=>v!==0&&v===solution[i]).length;
+  document.getElementById('progressDisplay').textContent=Math.round((filled/TOTAL)*100)+'%';
+}
+
+function checkWin(){
+  for(let i=0;i<TOTAL;i++) if(board[i]!==solution[i]) return;
+  clearInterval(timerInterval);
+  const m=Math.floor(timerSeconds/60).toString().padStart(2,'0');
+  const s=(timerSeconds%60).toString().padStart(2,'0');
+  document.getElementById('winTime').textContent=`זמן: ${m}:${s}`;
+  setTimeout(()=>{
+    document.getElementById('winOverlay').classList.add('show');
+    launchConfetti();
+  },400);
+}
+
+function launchConfetti(){
+  const colors=['#E07B39','#F4A96A','#5B8FB9','#6BAA75','#A8CCE8','#FFD700'];
+  const container=document.getElementById('confetti'); container.innerHTML='';
+  for(let i=0;i<90;i++){
+    const p=document.createElement('div'); p.className='confetti-piece';
+    p.style.left=Math.random()*100+'vw';
+    p.style.background=colors[Math.floor(Math.random()*colors.length)];
+    p.style.animationDuration=(2+Math.random()*3)+'s';
+    p.style.animationDelay=(Math.random()*2)+'s';
+    p.style.borderRadius=Math.random()>0.5?'50%':'2px';
+    container.appendChild(p);
+  }
+}
+
+// ── Instructions toggle ─────────────────────────────────
+function toggleInstructions(){
+  const body=document.getElementById('instrBody');
+  const arrow=document.getElementById('instrArrow');
+  body.classList.toggle('open');
+  arrow.classList.toggle('open');
+}
+
+// ── Keyboard ────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  const k=e.key;
+  if(k>='1'&&k<=String(MAX_NUM)) { enterNumber(parseInt(k)); return; }
+  if(k==='Backspace'||k==='Delete') { deleteCell(); return; }
+  if(k==='ArrowRight') moveSelection(0,-1);
+  else if(k==='ArrowLeft')  moveSelection(0,1);
+  else if(k==='ArrowUp')    moveSelection(-1,0);
+  else if(k==='ArrowDown')  moveSelection(1,0);
+  else if((e.ctrlKey||e.metaKey)&&k==='z'){e.preventDefault();undo();}
+  else if((e.ctrlKey||e.metaKey)&&k==='y'){e.preventDefault();redo();}
+});
+
+function moveSelection(dr,dc){
+  if(selectedCell===-1){selectCell(0);return;}
+  const row=Math.floor(selectedCell/SIZE)+dr;
+  const col=selectedCell%SIZE+dc;
+  if(row<0||row>=SIZE||col<0||col>=SIZE) return;
+  selectCell(row*SIZE+col);
+}
+
+// ── Init ─────────────────────────────────────────────────
+startGame();
+</script>
+</body>
+</html>
